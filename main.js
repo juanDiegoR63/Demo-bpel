@@ -1,13 +1,13 @@
-// ---------- Global state ----------
+// ---------- Estado global ----------
 let currentScenario = null;
 let processStart = 0;
 let executedSteps = 0;
 let runtimeRAF = null;
 
-let vars = {};        // live variables (order, auth, inventory, reply, compensation)
-let events = [];      // timeline
+let vars = {};        // variables en tiempo real (order, auth, inventory, reply, compensation)
+let events = [];      // cronología
 
-// speed: 1..100 => factor 0.5x..2x (más alto = más rápido)
+// velocidad: 1..200 => factor 0.1x..10x (más alto = más rápido)
 let speedFactor = 1;
 
 // ---------- DOM ----------
@@ -30,40 +30,40 @@ const el = {
   copyBtn:    document.getElementById('copy-json'),
 };
 
-// ---------- Steps (map to BPEL) ----------
+// ---------- Pasos (mapeo a BPEL) ----------
 /*
-  BPEL mapping:
-  - Receive       -> receive
-  - Authorize     -> invoke (sync)
-  - Decision      -> if
-  - Reserve       -> invoke (sync)
-  - Reply         -> reply
-  - Refund (only inventory fail) -> compensation (undo effect of prior invoke)
+  Mapeo BPEL:
+  - Recibir       -> receive
+  - Autorizar     -> invoke (sync)
+  - Decisión      -> if
+  - Reservar      -> invoke (sync)
+  - Responder     -> reply
+  - Reembolso (solo si falla inventario) -> compensation (deshacer efecto de invoke previo)
 */
 const STEPS = [
-  { id: 'receive',   name: 'Receive Request',         desc: 'Processing incoming request',    icon: 'download' },
-  { id: 'payment',   name: 'Authorize Payment',       desc: 'Authorizing payment provider',   icon: 'credit_card' },
-  { id: 'decision',  name: 'Payment Approved?',       desc: 'Evaluating authorization',       icon: 'help' },
-  { id: 'inventory', name: 'Reserve Inventory',       desc: 'Reserving items in stock',       icon: 'inventory_2' },
-  // Compensation step (conditionally used)
-  { id: 'refund',    name: 'Refund Payment (Comp.)',  desc: 'Compensating previous payment',  icon: 'undo' },
-  { id: 'reply',     name: 'Reply',                   desc: 'Sending final response',         icon: 'upload' },
+  { id: 'receive',   name: 'Recibir Solicitud',       desc: 'Procesando solicitud entrante',  icon: 'download' },
+  { id: 'payment',   name: 'Autorizar Pago',          desc: 'Autorizando proveedor de pago',  icon: 'credit_card' },
+  { id: 'decision',  name: '¿Pago Aprobado?',         desc: 'Evaluando autorización',         icon: 'help' },
+  { id: 'inventory', name: 'Reservar Inventario',     desc: 'Reservando elementos en stock',  icon: 'inventory_2' },
+  // Paso de compensación (usado condicionalmente)
+  { id: 'refund',    name: 'Reembolsar Pago (Comp.)', desc: 'Compensando pago anterior',      icon: 'undo' },
+  { id: 'reply',     name: 'Responder',               desc: 'Enviando respuesta final',       icon: 'upload' },
 ];
 
-// ---------- Init ----------
+// ---------- Inicialización ----------
 document.addEventListener('DOMContentLoaded', () => {
   renderSteps();
   renderTimeline();
   renderVars();
   updateKPIs(0);
 
-  // Dark mode
+  // Modo oscuro
   if (localStorage.getItem('darkMode') === 'true' ||
      (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     document.documentElement.classList.add('dark');
   }
 
-  // Events
+  // Eventos
   el.darkToggle.addEventListener('click', () => {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('darkMode', isDark);
@@ -75,10 +75,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   el.speed.addEventListener('input', (e) => {
     const v = parseInt(e.target.value, 10);
-    el.speedVal.textContent = v;
-    // 1..100 -> 0.5x..2x (50 => 1x)
-    speedFactor = v >= 50 ? 1 + (v - 50) / 50   // 50->1, 100->2
-                          : 0.5 + (v / 50) * 0.5; // 1->0.51..., 49->0.99
+    
+    // Nueva lógica: 1..200 -> 0.1x..10x (100 => 1x)
+    if (v <= 100) {
+      // 1->0.1x, 100->1x (escala logarítmica para mejor control en velocidades lentas)
+      speedFactor = 0.1 + (v - 1) * 0.9 / 99;
+    } else {
+      // 101->1.1x, 200->10x (escala más agresiva para velocidades altas)
+      speedFactor = 1 + (v - 100) * 9 / 100;
+    }
+    
+    // Mostrar el factor de velocidad con formato amigable
+    el.speedVal.textContent = speedFactor < 1 
+      ? (speedFactor * 100).toFixed(0) + '%'
+      : speedFactor.toFixed(1) + 'x';
   });
 
   el.copyBtn.addEventListener('click', async () => {
@@ -86,14 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.keys(vars).length ? JSON.stringify(vars, null, 2) : '{}'
     );
     const prev = el.copyBtn.innerHTML;
-    el.copyBtn.innerHTML = '<span class="material-symbols-outlined text-base mr-1">check</span> Copied!';
+    el.copyBtn.innerHTML = '<span class="material-symbols-outlined text-base mr-1">check</span> ¡Copiado!';
     setTimeout(() => (el.copyBtn.innerHTML = prev), 900);
   });
 
   setStatus('ready');
 });
 
-// ---------- Rendering ----------
+// ---------- Renderizado ----------
 function renderSteps() {
   el.stepCards.innerHTML = STEPS.map(s => stepCardTemplate(s)).join('');
 }
@@ -141,7 +151,7 @@ function setStepState(id, state, newDesc, durationMs) {
 
   if (state === 'pending') {
     root.classList.add('opacity-60');
-    status.textContent = 'Pending';
+    status.textContent = 'Pendiente';
     bar.style.width = '0%';
   }
 
@@ -149,7 +159,7 @@ function setStepState(id, state, newDesc, durationMs) {
     root.classList.add('opacity-100','border-primary/50','bg-primary/5','dark:bg-primary/10');
     icon.classList.add('bg-status-running/20','text-status-running');
     status.classList.add('bg-status-running/20','text-status-running');
-    status.textContent = 'Running';
+    status.textContent = 'Ejecutando';
     bar.classList.add('bg-status-running','progress-pulse');
     bar.style.width = '100%';
   }
@@ -183,7 +193,7 @@ function renderTimeline() {
     el.timeline.innerHTML = `
       <li class="text-center py-8 text-gray-600 dark:text-gray-300">
         <span class="material-symbols-outlined text-4xl mb-2 opacity-50">timeline</span>
-        <p>Events will appear here during process execution</p>
+        <p>Los eventos aparecerán aquí durante la ejecución del proceso</p>
       </li>`;
     return;
   }
@@ -222,7 +232,7 @@ function renderTimeline() {
 
 function renderVars() {
   el.varsPre.textContent = Object.keys(vars).length ? JSON.stringify(vars, null, 2)
-                                                    : '{\n  // Variables will appear here during execution\n}';
+                                                    : '{\n  // Las variables aparecerán aquí durante la ejecución\n}';
 }
 
 function setStatus(s) {
@@ -232,19 +242,19 @@ function setStatus(s) {
   el.statusPing.classList.remove('bg-status-info','bg-status-ok','bg-status-running','bg-status-error');
 
   if (s==='ready') {
-    el.statusText.textContent = 'Ready';
+    el.statusText.textContent = 'Listo';
     el.statusText.classList.add('text-status-info');
     el.statusDot.classList.add('bg-status-info');
     el.statusPing.classList.add('bg-status-info');
   }
   if (s==='running') {
-    el.statusText.textContent = 'Running';
+    el.statusText.textContent = 'Ejecutando';
     el.statusText.classList.add('text-status-running');
     el.statusDot.classList.add('bg-status-running');
     el.statusPing.classList.add('bg-status-running');
   }
   if (s==='success') {
-    el.statusText.textContent = 'Finished';
+    el.statusText.textContent = 'Finalizado';
     el.statusText.classList.add('text-status-ok');
     el.statusDot.classList.add('bg-status-ok');
     el.statusPing.classList.add('bg-status-ok');
@@ -261,20 +271,20 @@ function setButtons(disabled) {
   [el.btnHappy, el.btnReject, el.btnStock].forEach(b => b.disabled = disabled);
 }
 
-// ---------- Services (simulated invokes) ----------
+// ---------- Servicios (invocaciones simuladas) ----------
 function wait(ms) {
   return new Promise(res => setTimeout(res, ms / speedFactor));
 }
 
 async function paymentAuthorize(order) {
   const start = performance.now();
-  // Delay between 400..900 ms (scaled)
+  // Retraso entre 400..900 ms (escalado)
   await wait(400 + Math.random()*500);
   const approved = order.amount <= 200;
   const result = {
     approved,
     authId: approved ? `AUTH_${Date.now()}` : null,
-    reason: approved ? 'Payment approved' : 'Payment rejected (> limit)'
+    reason: approved ? 'Pago aprobado' : 'Pago rechazado (> límite)'
   };
   return { result, ms: performance.now() - start };
 }
@@ -286,12 +296,12 @@ async function inventoryReserve(order) {
   const result = {
     reserved,
     reservationId: reserved ? `RES_${Date.now()}` : null,
-    reason: reserved ? 'Inventory reserved' : 'No stock'
+    reason: reserved ? 'Inventario reservado' : 'Sin stock'
   };
   return { result, ms: performance.now() - start };
 }
 
-// Compensation for payment (undo effect)
+// Compensación para pago (efecto de deshacer)
 async function paymentRefund(auth) {
   const start = performance.now();
   await wait(250 + Math.random()*300);
@@ -299,7 +309,7 @@ async function paymentRefund(auth) {
   return { result, ms: performance.now() - start };
 }
 
-// ---------- Orchestration (BPEL-like) ----------
+// ---------- Orquestación (estilo BPEL) ----------
 async function run(mode) {
   if (currentScenario) return;
 
@@ -332,104 +342,104 @@ async function run(mode) {
       mode === 'nostock' ? { orderId:'A-1007', amount:125, customerId:'C-789' } :
                            { orderId:'A-1001', amount:125, customerId:'C-123' };
 
-    // Step 1 — Receive (BPEL receive)
+    // Paso 1 — Recibir (BPEL receive)
     const t1 = performance.now();
-    setStepState('receive','running','Processing incoming request…');
-    addEvent('Request received', 'info');
+    setStepState('receive','running','Procesando solicitud entrante…');
+    addEvent('Solicitud recibida', 'info');
     await wait(120);
     vars.order = order;
-    setStepState('receive','success', 'Request processed', performance.now()-t1);
-    addEvent('Request processed', 'success', performance.now()-t1);
+    setStepState('receive','success', 'Solicitud procesada', performance.now()-t1);
+    addEvent('Solicitud procesada', 'success', performance.now()-t1);
     executedSteps++;
 
-    // Step 2 — Authorize Payment (BPEL invoke)
+    // Paso 2 — Autorizar Pago (BPEL invoke)
     const t2 = performance.now();
-    setStepState('payment','running','Contacting payment provider…');
-    addEvent('Payment authorization started', 'info');
+    setStepState('payment','running','Contactando proveedor de pago…');
+    addEvent('Autorización de pago iniciada', 'info');
     const { result: auth, ms: msAuth } = await paymentAuthorize(order);
     vars.auth = auth;
     if (auth.approved) {
-      setStepState('payment','success','Payment authorized', msAuth);
-      addEvent('Payment authorized', 'success', msAuth);
+      setStepState('payment','success','Pago autorizado', msAuth);
+      addEvent('Pago autorizado', 'success', msAuth);
     } else {
-      setStepState('payment','error','Payment rejected', msAuth);
-      addEvent(`Payment rejected: ${auth.reason}`, 'error', msAuth);
+      setStepState('payment','error','Pago rechazado', msAuth);
+      addEvent(`Pago rechazado: ${auth.reason}`, 'error', msAuth);
     }
     executedSteps++;
 
-    // Step 3 — Decision (BPEL if)
+    // Paso 3 — Decisión (BPEL if)
     const t3 = performance.now();
-    setStepState('decision','running','Evaluating payment result…');
+    setStepState('decision','running','Evaluando resultado del pago…');
     await wait(80);
     if (!auth.approved) {
-      setStepState('decision','success','Payment not approved → skip reserve', performance.now()-t3);
-      addEvent('Decision: reject path', 'error', performance.now()-t3);
+      setStepState('decision','success','Pago no aprobado → omitir reserva', performance.now()-t3);
+      addEvent('Decisión: ruta de rechazo', 'error', performance.now()-t3);
 
-      // Step 5 — Reply (reject) (BPEL reply)
+      // Paso 5 — Responder (rechazo) (BPEL reply)
       const t5r = performance.now();
-      setStepState('reply','running','Sending rejection…');
+      setStepState('reply','running','Enviando rechazo…');
       await wait(180);
-      vars.reply = { status:'rejected', message:'Order rejected - payment failed', ts:new Date().toISOString() };
-      setStepState('reply','success','Rejection sent', performance.now()-t5r);
-      addEvent('Order rejection sent', 'success', performance.now()-t5r);
+      vars.reply = { status:'rejected', message:'Orden rechazada - pago fallido', ts:new Date().toISOString() };
+      setStepState('reply','success','Rechazo enviado', performance.now()-t5r);
+      addEvent('Rechazo de orden enviado', 'success', performance.now()-t5r);
       executedSteps++;
 
       finish(true);
       return;
     } else {
-      setStepState('decision','success','Payment approved → continue', performance.now()-t3);
-      addEvent('Decision: approved path', 'success', performance.now()-t3);
+      setStepState('decision','success','Pago aprobado → continuar', performance.now()-t3);
+      addEvent('Decisión: ruta aprobada', 'success', performance.now()-t3);
       executedSteps++;
     }
 
-    // Step 4 — Reserve Inventory (BPEL invoke)
+    // Paso 4 — Reservar Inventario (BPEL invoke)
     const t4 = performance.now();
-    setStepState('inventory','running','Checking inventory…');
-    addEvent('Inventory reservation started', 'info');
+    setStepState('inventory','running','Verificando inventario…');
+    addEvent('Reserva de inventario iniciada', 'info');
     const { result: inv, ms: msInv } = await inventoryReserve(order);
     vars.inventory = inv;
 
     if (inv.reserved) {
-      setStepState('inventory','success','Inventory reserved', msInv);
-      addEvent('Inventory reserved', 'success', msInv);
+      setStepState('inventory','success','Inventario reservado', msInv);
+      addEvent('Inventario reservado', 'success', msInv);
       executedSteps++;
 
-      // Step 5 — Reply (confirm)
+      // Paso 5 — Responder (confirmar)
       const t5 = performance.now();
-      setStepState('reply','running','Sending confirmation…');
+      setStepState('reply','running','Enviando confirmación…');
       await wait(180);
-      vars.reply = { status:'confirmed', message:'Order confirmed', ts:new Date().toISOString() };
-      setStepState('reply','success','Confirmation sent', performance.now()-t5);
-      addEvent('Order confirmation sent', 'success', performance.now()-t5);
+      vars.reply = { status:'confirmed', message:'Orden confirmada', ts:new Date().toISOString() };
+      setStepState('reply','success','Confirmación enviada', performance.now()-t5);
+      addEvent('Confirmación de orden enviada', 'success', performance.now()-t5);
       executedSteps++;
 
       finish(true);
       return;
     } else {
-      setStepState('inventory','error','Inventory not available', msInv);
-      addEvent(`Inventory failed: ${inv.reason}`, 'error', msInv);
+      setStepState('inventory','error','Inventario no disponible', msInv);
+      addEvent(`Inventario falló: ${inv.reason}`, 'error', msInv);
       executedSteps++;
 
-      // *** COMPENSATION *** (BPEL compensation handler)
-      // Payment succeeded but inventory failed → refund
+      // *** COMPENSACIÓN *** (BPEL compensation handler)
+      // Pago exitoso pero inventario falló → reembolso
       const tC = performance.now();
-      setStepState('refund','running','Compensating: refunding payment…');
-      addEvent('Compensation started (refund)', 'info');
+      setStepState('refund','running','Compensando: reembolsando pago…');
+      addEvent('Compensación iniciada (reembolso)', 'info');
       const { result: comp, ms: msComp } = await paymentRefund(vars.auth);
       vars.compensation = comp;
       setStepState('refund', comp.refunded ? 'success' : 'error',
-        comp.refunded ? 'Refund complete' : 'Refund failed', msComp);
-      addEvent(comp.refunded ? 'Refund complete' : 'Refund failed',
+        comp.refunded ? 'Reembolso completo' : 'Reembolso falló', msComp);
+      addEvent(comp.refunded ? 'Reembolso completo' : 'Reembolso falló',
                comp.refunded ? 'success' : 'error', msComp);
       executedSteps++;
 
-      // Step 5 — Reply (reject)
+      // Paso 5 — Responder (rechazar)
       const t5b = performance.now();
-      setStepState('reply','running','Sending rejection…');
+      setStepState('reply','running','Enviando rechazo…');
       await wait(160);
-      vars.reply = { status:'rejected', message:'Order rejected - no stock (payment refunded)', ts:new Date().toISOString() };
-      setStepState('reply','success','Rejection sent', performance.now()-t5b);
-      addEvent('Order rejection sent', 'success', performance.now()-t5b);
+      vars.reply = { status:'rejected', message:'Orden rechazada - sin inventario (pago reembolsado)', ts:new Date().toISOString() };
+      setStepState('reply','success','Rechazo enviado', performance.now()-t5b);
+      addEvent('Rechazo de orden enviado', 'success', performance.now()-t5b);
       executedSteps++;
 
       finish(true);
@@ -438,10 +448,10 @@ async function run(mode) {
 
   } catch (e) {
     console.error(e);
-    addEvent(`Process failed: ${e.message||e}`, 'error');
+    addEvent(`Proceso falló: ${e.message||e}`, 'error');
     setStatus('error');
   } finally {
-    // stop runtime ticker in finish()
+    // detener ticker de tiempo de ejecución en finish()
   }
 }
 
@@ -449,10 +459,10 @@ function finish(ok) {
   cancelAnimationFrame(runtimeRAF);
   const totalMs = performance.now() - processStart;
   updateKPIs(totalMs);
-  addEvent('Process completed', ok?'success':'error', totalMs);
+  addEvent('Proceso completado', ok?'success':'error', totalMs);
   setStatus(ok ? 'success' : 'error');
   setButtons(false);
-  renderVars(); // final state
+  renderVars(); // estado final
   currentScenario = null;
 }
 
@@ -462,4 +472,261 @@ function updateKPIs(ms) {
   el.kpiSteps.textContent = String(executedSteps);
   el.kpiRetries.textContent = '0';
   renderVars();
+}
+
+// ---------- Funciones del Código BPEL ----------
+function copyBPELCode() {
+  const bpelCode = `<?xml version="1.0" encoding="UTF-8"?>
+<process name="OrderProcessing" 
+         targetNamespace="http://ejemplo.com/orderprocess" 
+         xmlns="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+         xmlns:tns="http://ejemplo.com/orderprocess"
+         xmlns:client="http://cliente.ejemplo.com">
+
+  <!-- Variables para mantener el estado del proceso -->
+  <variables>
+    <variable name="orderRequest" messageType="client:OrderRequest"/>
+    <variable name="paymentResponse" messageType="client:PaymentResponse"/>
+    <variable name="inventoryResponse" messageType="client:InventoryResponse"/>
+    <variable name="orderResponse" messageType="client:OrderResponse"/>
+  </variables>
+
+  <!-- Secuencia principal del proceso -->
+  <sequence>
+    <!-- 1. Recibir solicitud del cliente -->
+    <receive name="ReceiveOrder" 
+             partnerLink="ClientLink" 
+             operation="processOrder" 
+             variable="orderRequest"/>
+
+    <!-- 2. Autorizar pago -->
+    <invoke name="AuthorizePayment" 
+            partnerLink="PaymentLink" 
+            operation="authorizePayment" 
+            inputVariable="orderRequest" 
+            outputVariable="paymentResponse"/>
+
+    <!-- 3. Decisión basada en resultado del pago -->
+    <if name="CheckPaymentApproval">
+      <condition>$paymentResponse.approved = 'true'</condition>
+      
+      <!-- Pago aprobado: continuar con inventario -->
+      <sequence>
+        <!-- 4. Reservar inventario -->
+        <invoke name="ReserveInventory" 
+                partnerLink="InventoryLink" 
+                operation="reserveItems" 
+                inputVariable="orderRequest" 
+                outputVariable="inventoryResponse"/>
+
+        <!-- Verificar disponibilidad de inventario -->
+        <if name="CheckInventoryAvailability">
+          <condition>$inventoryResponse.available = 'true'</condition>
+          
+          <!-- Inventario disponible: confirmar orden -->
+          <assign name="SetConfirmationResponse">
+            <copy>
+              <from literal="confirmed"/>
+              <to>$orderResponse.status</to>
+            </copy>
+            <copy>
+              <from literal="Orden confirmada exitosamente"/>
+              <to>$orderResponse.message</to>
+            </copy>
+          </assign>
+          
+          <!-- Inventario no disponible: compensar pago -->
+          <else>
+            <compensationHandler>
+              <invoke name="RefundPayment" 
+                      partnerLink="PaymentLink" 
+                      operation="refundPayment" 
+                      inputVariable="paymentResponse"/>
+            </compensationHandler>
+            
+            <assign name="SetRejectionResponse">
+              <copy>
+                <from literal="rejected"/>
+                <to>$orderResponse.status</to>
+              </copy>
+              <copy>
+                <from literal="Orden rechazada - sin inventario (pago reembolsado)"/>
+                <to>$orderResponse.message</to>
+              </copy>
+            </assign>
+          </else>
+        </if>
+      </sequence>
+      
+      <!-- Pago rechazado: rechazar orden -->
+      <else>
+        <assign name="SetPaymentRejectionResponse">
+          <copy>
+            <from literal="rejected"/>
+            <to>$orderResponse.status</to>
+          </copy>
+          <copy>
+            <from literal="Orden rechazada - pago fallido"/>
+            <to>$orderResponse.message</to>
+          </copy>
+        </assign>
+      </else>
+    </if>
+
+    <!-- 5. Enviar respuesta final al cliente -->
+    <reply name="SendResponse" 
+           partnerLink="ClientLink" 
+           operation="processOrder" 
+           variable="orderResponse"/>
+  </sequence>
+</process>`;
+
+  navigator.clipboard.writeText(bpelCode).then(() => {
+    // Cambiar el texto del botón temporalmente
+    const copyBtn = document.querySelector('[onclick="copyBPELCode()"]');
+    const originalText = copyBtn.innerHTML;
+    copyBtn.innerHTML = '<span class="material-symbols-outlined text-base mr-1">check</span> ¡Copiado!';
+    copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    copyBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    
+    setTimeout(() => {
+      copyBtn.innerHTML = originalText;
+      copyBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+      copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+    }, 2000);
+  }).catch(err => {
+    console.error('Error al copiar código BPEL:', err);
+    alert('Error al copiar el código al portapapeles');
+  });
+}
+
+function downloadBPEL() {
+  const bpelCode = `<?xml version="1.0" encoding="UTF-8"?>
+<process name="OrderProcessing" 
+         targetNamespace="http://ejemplo.com/orderprocess" 
+         xmlns="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+         xmlns:tns="http://ejemplo.com/orderprocess"
+         xmlns:client="http://cliente.ejemplo.com">
+
+  <!-- Variables para mantener el estado del proceso -->
+  <variables>
+    <variable name="orderRequest" messageType="client:OrderRequest"/>
+    <variable name="paymentResponse" messageType="client:PaymentResponse"/>
+    <variable name="inventoryResponse" messageType="client:InventoryResponse"/>
+    <variable name="orderResponse" messageType="client:OrderResponse"/>
+  </variables>
+
+  <!-- Secuencia principal del proceso -->
+  <sequence>
+    <!-- 1. Recibir solicitud del cliente -->
+    <receive name="ReceiveOrder" 
+             partnerLink="ClientLink" 
+             operation="processOrder" 
+             variable="orderRequest"/>
+
+    <!-- 2. Autorizar pago -->
+    <invoke name="AuthorizePayment" 
+            partnerLink="PaymentLink" 
+            operation="authorizePayment" 
+            inputVariable="orderRequest" 
+            outputVariable="paymentResponse"/>
+
+    <!-- 3. Decisión basada en resultado del pago -->
+    <if name="CheckPaymentApproval">
+      <condition>$paymentResponse.approved = 'true'</condition>
+      
+      <!-- Pago aprobado: continuar con inventario -->
+      <sequence>
+        <!-- 4. Reservar inventario -->
+        <invoke name="ReserveInventory" 
+                partnerLink="InventoryLink" 
+                operation="reserveItems" 
+                inputVariable="orderRequest" 
+                outputVariable="inventoryResponse"/>
+
+        <!-- Verificar disponibilidad de inventario -->
+        <if name="CheckInventoryAvailability">
+          <condition>$inventoryResponse.available = 'true'</condition>
+          
+          <!-- Inventario disponible: confirmar orden -->
+          <assign name="SetConfirmationResponse">
+            <copy>
+              <from literal="confirmed"/>
+              <to>$orderResponse.status</to>
+            </copy>
+            <copy>
+              <from literal="Orden confirmada exitosamente"/>
+              <to>$orderResponse.message</to>
+            </copy>
+          </assign>
+          
+          <!-- Inventario no disponible: compensar pago -->
+          <else>
+            <compensationHandler>
+              <invoke name="RefundPayment" 
+                      partnerLink="PaymentLink" 
+                      operation="refundPayment" 
+                      inputVariable="paymentResponse"/>
+            </compensationHandler>
+            
+            <assign name="SetRejectionResponse">
+              <copy>
+                <from literal="rejected"/>
+                <to>$orderResponse.status</to>
+              </copy>
+              <copy>
+                <from literal="Orden rechazada - sin inventario (pago reembolsado)"/>
+                <to>$orderResponse.message</to>
+              </copy>
+            </assign>
+          </else>
+        </if>
+      </sequence>
+      
+      <!-- Pago rechazado: rechazar orden -->
+      <else>
+        <assign name="SetPaymentRejectionResponse">
+          <copy>
+            <from literal="rejected"/>
+            <to>$orderResponse.status</to>
+          </copy>
+          <copy>
+            <from literal="Orden rechazada - pago fallido"/>
+            <to>$orderResponse.message</to>
+          </copy>
+        </assign>
+      </else>
+    </if>
+
+    <!-- 5. Enviar respuesta final al cliente -->
+    <reply name="SendResponse" 
+           partnerLink="ClientLink" 
+           operation="processOrder" 
+           variable="orderResponse"/>
+  </sequence>
+</process>`;
+
+  // Crear elemento de descarga
+  const blob = new Blob([bpelCode], { type: 'application/xml' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'OrderProcessing.bpel';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+
+  // Feedback visual para el botón de descarga
+  const downloadBtn = document.querySelector('[onclick="downloadBPEL()"]');
+  const originalText = downloadBtn.innerHTML;
+  downloadBtn.innerHTML = '<span class="material-symbols-outlined text-base mr-1">download_done</span> ¡Descargado!';
+  downloadBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+  downloadBtn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+  
+  setTimeout(() => {
+    downloadBtn.innerHTML = originalText;
+    downloadBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+    downloadBtn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+  }, 2000);
 }
