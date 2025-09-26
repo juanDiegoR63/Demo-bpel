@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo de Orquestación BPEL</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2071f3',
+                        'background-light': '#f5f7f8',
+                        'background-dark': '#101722',
+                        'status-ok': '#16a34a',
+                        'status-running': '#f59e0b',
+                        'status-error': '#ef4444',
+                        'status-info': '#0891B2',
+                    },
+                    fontFamily: { display: ['Inter', 'sans-serif'] },
+                    borderRadius: { 'xl': '1.25rem' }
+                }
+            }
+        };
+    </script>
+    <style>
+        @keyframes progress-fill {
+            from {
+                width: 0%
+            }
+
+            to {
+                width: 100%
+            }
+        }
+
+        .progress-pulse {
+            animation: progress-fill 1.8s linear infinite
+        }
+
+        /* Estilos para resaltado de código BPEL */
+        .bpel-comment {
+            color: #059669; /* Verde esmeralda */
+            font-weight: 600;
+            font-style: italic;
+        }
+        
+        .dark .bpel-comment {
+            color: #10b981; /* Verde claro para modo oscuro */
+        }
+        
+        .bpel-tag {
+            color: #3b82f6; /* Azul para etiquetas */
+            font-weight: 500;
+        }
+        
+        .dark .bpel-tag {
+            color: #60a5fa; /* Azul claro para modo oscuro */
+        }
+        
+        .bpel-attribute {
+            color: #8b5cf6; /* Púrpura para atributos */
+        }
+        
+        .dark .bpel-attribute {
+            color: #a78bfa; /* Púrpura claro para modo oscuro */
+        }
+        
+        .bpel-string {
+            color: #f59e0b; /* Naranja para strings */
+        }
+        
+        .dark .bpel-string {
+            color: #fbbf24; /* Naranja claro para modo oscuro */
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
+        }
+    </style>
+</head>
+
+<body class="font-display bg-background-light dark:bg-background-dark min-h-screen">
+    <!-- Header -->
+    <header
+        class="sticky top-0 z-10 w-full border-b border-gray-200 dark:border-gray-800 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
+        <div class="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+            <div class="flex items-center gap-3">
+                <svg class="h-6 w-6 text-gray-800 dark:text-white" fill="none" viewBox="0 0 48 48">
+                    <path d="M24 .76 47.24 24 24 47.24.76 24 24 .76ZM21 35.76V12.24L9.24 24 21 35.76Z"
+                        fill="currentColor" />
+                </svg>
+                <h1 class="text-xl font-bold text-gray-800 dark:text-white">Demo de Orquestación</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="relative flex h-2 w-2">
+                        <span id="status-ping"
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-info opacity-75"></span>
+                        <span id="status-dot" class="relative inline-flex rounded-full h-2 w-2 bg-status-info"></span>
+                    </span>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Estado: <span id="status-text" class="font-bold text-status-info">Listo</span>
+                    </span>
+                </div>
+                <button id="dark-toggle"
+                    class="flex h-9 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 px-3 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700">
+                    <span class="material-symbols-outlined text-base">dark_mode</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="py-8 text-center">
+        <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-gray-800 dark:text-white">
+                Flujo de Orquestación Simple
+            </h2>
+
+            <!-- Mini flow line -->
+            <div
+                class="mt-5 flex flex-col items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 sm:flex-row sm:gap-2">
+                <div class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                    <span class="font-semibold">Recibir</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Autorizar</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                </div>
+                <div
+                    class="my-1 sm:my-0 flex items-center gap-2 rounded-md border border-dashed border-primary/50 bg-primary/10 px-2 py-1 text-xs text-primary">
+                    <span class="font-semibold">¿Aprobado?</span>
+                    <div class="h-4 w-px bg-primary/30"></div>
+                    <span class="font-bold text-status-ok">Sí</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Reservar</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Responder: Confirmar</span>
+                </div>
+                <div class="hidden sm:flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                    <span class="material-symbols-outlined text-base text-status-error">subdirectory_arrow_right</span>
+                    <span class="font-bold text-status-error">No</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Responder: Rechazar</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main -->
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
+        <div class="grid grid-cols-1 gap-6 lg:gap-8 lg:grid-cols-12 xl:grid-cols-12">
+            <!-- Left: Controls + Steps -->
+            <div class="lg:col-span-7 xl:col-span-8">
+                <!-- Controls -->
+                <div
+                    class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-6 shadow-sm">
+                    <div class="mb-5">
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-white">Panel de Control</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Ejecuta un escenario y observa la orquestación.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3 mb-6">
+                        <button id="btn-happy"
+                            class="h-10 rounded-lg bg-primary/15 px-4 text-sm font-bold text-primary hover:bg-primary/25 disabled:opacity-50">
+                            <span class="material-symbols-outlined mr-1 text-xl align-middle">play_circle</span> Ejecutar
+                            Flujo Exitoso
+                        </button>
+                        <button id="btn-reject"
+                            class="h-10 rounded-lg bg-gray-100 dark:bg-gray-800 px-4 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50">
+                            Ejecutar Pago Rechazado
+                        </button>
+                        <button id="btn-nostock"
+                            class="h-10 rounded-lg bg-gray-100 dark:bg-gray-800 px-4 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50">
+                            Ejecutar Sin Inventario
+                        </button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label for="speed" class="text-sm font-medium text-gray-800 dark:text-white">Velocidad</label>
+                            <span id="speed-value" class="text-sm font-bold text-primary min-w-[4ch]">1.0x</span>
+                        </div>
+                        <div class="relative">
+                            <input id="speed" type="range" min="1" max="200" value="100" class="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 dark:bg-gray-700
+                    [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none
+                    [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-lg">
+                            <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">
+                                <span>Muy lento</span>
+                                <span class="font-medium">Normal</span>
+                                <span>Muy rápido</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Steps -->
+                <div class="mt-8">
+                    <h3 class="text-xl font-bold tracking-tight text-gray-800 dark:text-white mb-3">Tarjetas de Pasos</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                        <b>Mapeo a BPEL:</b> Recibir → <i>receive</i>, Autorizar/Reservar → <i>invoke</i>, Decisión →
+                        <i>if</i>, Responder → <i>reply</i>, Reembolso → <i>compensation</i>.
+                    </p>
+                    <div id="step-cards" class="space-y-4"></div>
+                </div>
+            </div>
+
+            <!-- Right: Timeline + Vars -->
+            <div class="lg:col-span-5 xl:col-span-4 space-y-8">
+                <div>
+                    <h3 class="text-xl font-bold tracking-tight text-gray-800 dark:text-white mb-4">Cronología</h3>
+                    <ul id="timeline" class="-mb-8" role="list"></ul>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold tracking-tight text-gray-800 dark:text-white mb-4">Variables e Indicadores
+                    </h3>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+                        <div
+                            class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-4 shadow-sm">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Tiempo Total</p>
+                            <p id="kpi-runtime" class="text-2xl font-bold text-gray-800 dark:text-white">0.0s</p>
+                        </div>
+                        <div
+                            class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-4 shadow-sm">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Pasos Ejecutados</p>
+                            <p id="kpi-steps" class="text-2xl font-bold text-gray-800 dark:text-white">0</p>
+                        </div>
+                        <div
+                            class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-4 shadow-sm">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Reintentos</p>
+                            <p id="kpi-retries" class="text-2xl font-bold text-gray-800 dark:text-white">0</p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm">
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-800">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-bold text-gray-800 dark:text-white">Variables en Tiempo Real</h4>
+                                <button id="copy-json"
+                                    class="flex items-center h-8 px-3 text-xs font-bold rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700">
+                                    <span class="material-symbols-outlined text-base mr-1">content_copy</span> Copiar JSON
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Orden, autorización, inventario, respuesta y
+                                compensación.</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 dark:bg-gray-800">
+                            <pre id="variables-json" class="text-xs text-gray-800 dark:text-gray-200 overflow-x-auto"><code>{
+  // Las variables aparecerán aquí durante la ejecución
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Sección Explicativa BPEL -->
+    <section class="bg-gray-50 dark:bg-gray-800/50 py-16">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
+                    <span class="material-symbols-outlined text-4xl align-top mr-2">code</span>
+                    Código BPEL del Proceso
+                </h2>
+                <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">
+                    Comprende cada componente del proceso de orquestación BPEL implementado
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Código BPEL -->
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <span class="material-symbols-outlined mr-2">description</span>
+                        Proceso BPEL Completo
+                    </h3>
+                    <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-x-auto">
+                        <pre class="text-sm text-gray-700 dark:text-gray-300" id="bpel-code">&lt;?xml version=<span class="bpel-string">"1.0"</span> encoding=<span class="bpel-string">"UTF-8"</span>?&gt;
+<span class="bpel-tag">&lt;process</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"PurchaseOrder"</span> 
+         <span class="bpel-attribute">targetNamespace</span>=<span class="bpel-string">"http://example.com/bpel/purchaseorder"</span>
+         <span class="bpel-attribute">xmlns</span>=<span class="bpel-string">"http://docs.oasis-open.org/wsbpel/2.0/process/executable"</span><span class="bpel-tag">&gt;</span>
+
+  <span class="bpel-comment">&lt;!-- Variables del proceso --&gt;</span>
+  <span class="bpel-tag">&lt;variables&gt;</span>
+    <span class="bpel-tag">&lt;variable</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"orderRequest"</span> <span class="bpel-attribute">messageType</span>=<span class="bpel-string">"po:OrderMessage"</span><span class="bpel-tag">/&gt;</span>
+    <span class="bpel-tag">&lt;variable</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"paymentResult"</span> <span class="bpel-attribute">messageType</span>=<span class="bpel-string">"pay:PaymentResponse"</span><span class="bpel-tag">/&gt;</span>
+    <span class="bpel-tag">&lt;variable</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"inventoryResult"</span> <span class="bpel-attribute">messageType</span>=<span class="bpel-string">"inv:InventoryResponse"</span><span class="bpel-tag">/&gt;</span>
+    <span class="bpel-tag">&lt;variable</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"orderResponse"</span> <span class="bpel-attribute">messageType</span>=<span class="bpel-string">"po:OrderResponse"</span><span class="bpel-tag">/&gt;</span>
+  <span class="bpel-tag">&lt;/variables&gt;</span>
+
+  <span class="bpel-comment">&lt;!-- Flujo principal --&gt;</span>
+  <span class="bpel-tag">&lt;sequence&gt;</span>
+    <span class="bpel-comment">&lt;!-- 1. Recibir orden --&gt;</span>
+    <span class="bpel-tag">&lt;receive</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"ReceiveOrder"</span> 
+             <span class="bpel-attribute">partnerLink</span>=<span class="bpel-string">"client"</span> 
+             <span class="bpel-attribute">operation</span>=<span class="bpel-string">"processOrder"</span>
+             <span class="bpel-attribute">variable</span>=<span class="bpel-string">"orderRequest"</span><span class="bpel-tag">/&gt;</span>
+
+    <span class="bpel-comment">&lt;!-- 2. Procesar pago --&gt;</span>
+    <span class="bpel-tag">&lt;invoke</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"AuthorizePayment"</span>
+            <span class="bpel-attribute">partnerLink</span>=<span class="bpel-string">"paymentService"</span>
+            <span class="bpel-attribute">operation</span>=<span class="bpel-string">"authorize"</span>
+            <span class="bpel-attribute">inputVariable</span>=<span class="bpel-string">"orderRequest"</span>
+            <span class="bpel-attribute">outputVariable</span>=<span class="bpel-string">"paymentResult"</span><span class="bpel-tag">/&gt;</span>
+
+    <span class="bpel-comment">&lt;!-- 3. Decisión basada en aprobación --&gt;</span>
+    <span class="bpel-tag">&lt;if</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"CheckPaymentApproval"</span><span class="bpel-tag">&gt;</span>
+      <span class="bpel-tag">&lt;condition&gt;</span>$paymentResult.approved = true<span class="bpel-tag">&lt;/condition&gt;</span>
+      
+      <span class="bpel-comment">&lt;!-- Flujo exitoso --&gt;</span>
+      <span class="bpel-tag">&lt;sequence&gt;</span>
+        <span class="bpel-comment">&lt;!-- 4. Reservar inventario --&gt;</span>
+        <span class="bpel-tag">&lt;invoke</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"ReserveInventory"</span>
+                <span class="bpel-attribute">partnerLink</span>=<span class="bpel-string">"inventoryService"</span>
+                <span class="bpel-attribute">operation</span>=<span class="bpel-string">"reserve"</span>
+                <span class="bpel-attribute">inputVariable</span>=<span class="bpel-string">"orderRequest"</span>
+                <span class="bpel-attribute">outputVariable</span>=<span class="bpel-string">"inventoryResult"</span><span class="bpel-tag">/&gt;</span>
+        
+        <span class="bpel-comment">&lt;!-- 5. Respuesta exitosa --&gt;</span>
+        <span class="bpel-tag">&lt;assign</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"PrepareSuccessResponse"</span><span class="bpel-tag">&gt;</span>
+          <span class="bpel-tag">&lt;copy&gt;</span>
+            <span class="bpel-tag">&lt;from&gt;</span><span class="bpel-string">'Order processed successfully'</span><span class="bpel-tag">&lt;/from&gt;</span>
+            <span class="bpel-tag">&lt;to</span> <span class="bpel-attribute">variable</span>=<span class="bpel-string">"orderResponse"</span> <span class="bpel-attribute">part</span>=<span class="bpel-string">"status"</span><span class="bpel-tag">/&gt;</span>
+          <span class="bpel-tag">&lt;/copy&gt;</span>
+        <span class="bpel-tag">&lt;/assign&gt;</span>
+      <span class="bpel-tag">&lt;/sequence&gt;</span>
+      
+      <span class="bpel-comment">&lt;!-- Flujo de rechazo --&gt;</span>
+      <span class="bpel-tag">&lt;else&gt;</span>
+        <span class="bpel-tag">&lt;assign</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"PrepareRejectResponse"</span><span class="bpel-tag">&gt;</span>
+          <span class="bpel-tag">&lt;copy&gt;</span>
+            <span class="bpel-tag">&lt;from&gt;</span><span class="bpel-string">'Payment rejected'</span><span class="bpel-tag">&lt;/from&gt;</span>
+            <span class="bpel-tag">&lt;to</span> <span class="bpel-attribute">variable</span>=<span class="bpel-string">"orderResponse"</span> <span class="bpel-attribute">part</span>=<span class="bpel-string">"status"</span><span class="bpel-tag">/&gt;</span>
+          <span class="bpel-tag">&lt;/copy&gt;</span>
+        <span class="bpel-tag">&lt;/assign&gt;</span>
+      <span class="bpel-tag">&lt;/else&gt;</span>
+    <span class="bpel-tag">&lt;/if&gt;</span>
+
+    <span class="bpel-comment">&lt;!-- 6. Enviar respuesta --&gt;</span>
+    <span class="bpel-tag">&lt;reply</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"SendResponse"</span>
+           <span class="bpel-attribute">partnerLink</span>=<span class="bpel-string">"client"</span>
+           <span class="bpel-attribute">operation</span>=<span class="bpel-string">"processOrder"</span>
+           <span class="bpel-attribute">variable</span>=<span class="bpel-string">"orderResponse"</span><span class="bpel-tag">/&gt;</span>
+  <span class="bpel-tag">&lt;/sequence&gt;</span>
+
+  <span class="bpel-comment">&lt;!-- Manejador de compensación --&gt;</span>
+  <span class="bpel-tag">&lt;compensationHandler&gt;</span>
+    <span class="bpel-tag">&lt;invoke</span> <span class="bpel-attribute">name</span>=<span class="bpel-string">"RefundPayment"</span>
+            <span class="bpel-attribute">partnerLink</span>=<span class="bpel-string">"paymentService"</span>
+            <span class="bpel-attribute">operation</span>=<span class="bpel-string">"refund"</span><span class="bpel-tag">/&gt;</span>
+  <span class="bpel-tag">&lt;/compensationHandler&gt;</span>
+
+<span class="bpel-tag">&lt;/process&gt;</span>
+                        </pre>
+                    </div>
+                </div>
+
+                <!-- Explicación de Componentes -->
+                <div class="space-y-6">
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                            <span class="material-symbols-outlined mr-2">school</span>
+                            Componentes BPEL Explicados
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">&lt;receive&gt;</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Recibe mensajes de entrada desde servicios externos o clientes. Es el punto de entrada del proceso.
+                                </p>
+                            </div>
+                            
+                            <div class="border-l-4 border-green-500 pl-4">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">&lt;invoke&gt;</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Invoca servicios web externos (como servicios de pago e inventario). Puede ser síncrono o asíncrono.
+                                </p>
+                            </div>
+                            
+                            <div class="border-l-4 border-yellow-500 pl-4">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">&lt;if&gt;</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Estructura de control condicional que permite bifurcar el flujo basado en condiciones lógicas.
+                                </p>
+                            </div>
+                            
+                            <div class="border-l-4 border-purple-500 pl-4">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">&lt;assign&gt;</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Asigna valores a variables del proceso. Usado para manipular datos y preparar respuestas.
+                                </p>
+                            </div>
+                            
+                            <div class="border-l-4 border-red-500 pl-4">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">&lt;reply&gt;</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Envía respuestas de vuelta al cliente que inició el proceso. Cierra la conversación.
+                                </p>
+                            </div>
+                            
+                            <div class="border-l-4 border-orange-500 pl-4">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">&lt;compensationHandler&gt;</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Define acciones de compensación para deshacer transacciones en caso de fallos (patrón SAGA).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flujo Visual -->
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                            <span class="material-symbols-outlined mr-2">account_tree</span>
+                            Flujo del Proceso
+                        </h3>
+                        
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                                <div>
+                                    <span class="font-medium text-gray-900 dark:text-white">Recibir Orden</span>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">El cliente envía una solicitud de compra</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                                <div>
+                                    <span class="font-medium text-gray-900 dark:text-white">Autorizar Pago</span>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">Verificar y autorizar el método de pago</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                                <div class="w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                                <div>
+                                    <span class="font-medium text-gray-900 dark:text-white">Decisión</span>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">¿Pago aprobado? Bifurcar el flujo</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                                <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
+                                <div>
+                                    <span class="font-medium text-gray-900 dark:text-white">Reservar Inventario</span>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">Solo si el pago fue aprobado</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                <div class="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div>
+                                <div>
+                                    <span class="font-medium text-gray-900 dark:text-white">Enviar Respuesta</span>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">Confirmar éxito o comunicar rechazo</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 text-center text-sm text-gray-600 dark:text-gray-300">
+            <div class="flex justify-center gap-6 mb-3">
+                <a class="hover:text-primary" href="https://docs.google.com/document/d/1ojKvuxx-Y24DelGBvuzfQcY6rjmBNIi57IQaKNxC1qE/edit?usp=sharing" target="_blank" rel="noopener noreferrer">¿Qué es BPEL?</a>
+            </div>
+            <p>© 2024 Demo de Orquestación BPEL. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Preload state classes so Tailwind CDN generates them -->
+    <div class="hidden">
+        <span class="text-status-info text-status-ok text-status-running text-status-error"></span>
+        <span class="bg-status-info bg-status-ok bg-status-running bg-status-error"></span>
+        <span class="bg-status-ok/20 bg-status-running/20 bg-status-error/20"></span>
+        <span class="border-status-ok/50 border-status-error/50 border-status-running/50"></span>
+    </div>
+
+    <script src="main.js" defer></script>
+</body>
+
+</html>
