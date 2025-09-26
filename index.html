@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orchestration Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2071f3',
+                        'background-light': '#f5f7f8',
+                        'background-dark': '#101722',
+                        'status-ok': '#16a34a',
+                        'status-running': '#f59e0b',
+                        'status-error': '#ef4444',
+                        'status-info': '#0891B2',
+                    },
+                    fontFamily: { display: ['Inter', 'sans-serif'] },
+                    borderRadius: { 'xl': '1.25rem' }
+                }
+            }
+        };
+    </script>
+    <style>
+        @keyframes progress-fill {
+            from {
+                width: 0%
+            }
+
+            to {
+                width: 100%
+            }
+        }
+
+        .progress-pulse {
+            animation: progress-fill 1.8s linear infinite
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
+        }
+    </style>
+</head>
+
+<body class="font-display bg-background-light dark:bg-background-dark min-h-screen">
+    <!-- Header -->
+    <header
+        class="sticky top-0 z-10 w-full border-b border-gray-200 dark:border-gray-800 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
+        <div class="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+            <div class="flex items-center gap-3">
+                <svg class="h-6 w-6 text-gray-800 dark:text-white" fill="none" viewBox="0 0 48 48">
+                    <path d="M24 .76 47.24 24 24 47.24.76 24 24 .76ZM21 35.76V12.24L9.24 24 21 35.76Z"
+                        fill="currentColor" />
+                </svg>
+                <h1 class="text-xl font-bold text-gray-800 dark:text-white">Orchestration Demo</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="relative flex h-2 w-2">
+                        <span id="status-ping"
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-info opacity-75"></span>
+                        <span id="status-dot" class="relative inline-flex rounded-full h-2 w-2 bg-status-info"></span>
+                    </span>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Status: <span id="status-text" class="font-bold text-status-info">Ready</span>
+                    </span>
+                </div>
+                <button id="dark-toggle"
+                    class="flex h-9 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 px-3 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700">
+                    <span class="material-symbols-outlined text-base">dark_mode</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="py-8 text-center">
+        <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-gray-800 dark:text-white">
+                Simple Orchestration Flow
+            </h2>
+            <p class="mt-4 max-w-2xl mx-auto text-base text-gray-600 dark:text-gray-300">
+                Visualizing a BPEL-style process: <b>receive</b> → <b>authorize payment</b> → <b>decision</b> →
+                <b>reserve</b> → <b>reply</b> (+ <b>compensation</b> when needed).
+            </p>
+
+            <!-- Mini flow line -->
+            <div
+                class="mt-5 flex flex-col items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 sm:flex-row sm:gap-2">
+                <div class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                    <span class="font-semibold">Receive</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Authorize</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                </div>
+                <div
+                    class="my-1 sm:my-0 flex items-center gap-2 rounded-md border border-dashed border-primary/50 bg-primary/10 px-2 py-1 text-xs text-primary">
+                    <span class="font-semibold">Approved?</span>
+                    <div class="h-4 w-px bg-primary/30"></div>
+                    <span class="font-bold text-status-ok">Yes</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Reserve</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Reply Confirm</span>
+                </div>
+                <div class="hidden sm:flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                    <span class="material-symbols-outlined text-base text-status-error">subdirectory_arrow_right</span>
+                    <span class="font-bold text-status-error">No</span><span
+                        class="material-symbols-outlined text-base">arrow_forward</span>
+                    <span class="font-semibold">Reply Reject</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main -->
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
+        <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <!-- Left: Controls + Steps -->
+            <div class="lg:col-span-2">
+                <!-- Controls -->
+                <div
+                    class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-6 shadow-sm">
+                    <div class="mb-5">
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-white">Control Panel</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Run a scenario and watch the orchestration.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3 mb-6">
+                        <button id="btn-happy"
+                            class="h-10 rounded-lg bg-primary/15 px-4 text-sm font-bold text-primary hover:bg-primary/25 disabled:opacity-50">
+                            <span class="material-symbols-outlined mr-1 text-xl align-middle">play_circle</span> Run
+                            Happy Path
+                        </button>
+                        <button id="btn-reject"
+                            class="h-10 rounded-lg bg-gray-100 dark:bg-gray-800 px-4 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50">
+                            Run Payment Rejected
+                        </button>
+                        <button id="btn-nostock"
+                            class="h-10 rounded-lg bg-gray-100 dark:bg-gray-800 px-4 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50">
+                            Run No Stock
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <label for="speed" class="text-sm font-medium text-gray-800 dark:text-white">Speed</label>
+                        <input id="speed" type="range" min="1" max="100" value="50" class="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 dark:bg-gray-700
+                [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none
+                [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary">
+                        <span id="speed-value"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[3ch]">50</span>
+                    </div>
+                </div>
+
+                <!-- Steps -->
+                <div class="mt-8">
+                    <h3 class="text-xl font-bold tracking-tight text-gray-800 dark:text-white mb-3">Step Cards</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                        <b>Mapping to BPEL:</b> Receive → <i>receive</i>, Authorize/Reserve → <i>invoke</i>, Decision →
+                        <i>if</i>, Reply → <i>reply</i>, Refund → <i>compensation</i>.
+                    </p>
+                    <div id="step-cards" class="space-y-4"></div>
+                </div>
+            </div>
+
+            <!-- Right: Timeline + Vars -->
+            <div class="lg:col-span-1 space-y-8">
+                <div>
+                    <h3 class="text-xl font-bold tracking-tight text-gray-800 dark:text-white mb-4">Timeline</h3>
+                    <ul id="timeline" class="-mb-8" role="list"></ul>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold tracking-tight text-gray-800 dark:text-white mb-4">Variables & KPIs
+                    </h3>
+
+                    <div class="grid grid-cols-1 gap-4 mb-6">
+                        <div
+                            class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-4 shadow-sm">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Total Runtime</p>
+                            <p id="kpi-runtime" class="text-2xl font-bold text-gray-800 dark:text-white">0.0s</p>
+                        </div>
+                        <div
+                            class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-4 shadow-sm">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Steps Executed</p>
+                            <p id="kpi-steps" class="text-2xl font-bold text-gray-800 dark:text-white">0</p>
+                        </div>
+                        <div
+                            class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-4 shadow-sm">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Retries</p>
+                            <p id="kpi-retries" class="text-2xl font-bold text-gray-800 dark:text-white">0</p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm">
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-800">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-bold text-gray-800 dark:text-white">Live Variables</h4>
+                                <button id="copy-json"
+                                    class="flex items-center h-8 px-3 text-xs font-bold rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700">
+                                    <span class="material-symbols-outlined text-base mr-1">content_copy</span> Copy JSON
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Order, auth, inventory, reply &
+                                compensation.</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 dark:bg-gray-800">
+                            <pre id="variables-json" class="text-xs text-gray-800 dark:text-gray-200 overflow-x-auto"><code>{
+  // Variables will appear here during execution
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 text-center text-sm text-gray-600 dark:text-gray-300">
+            <div class="flex justify-center gap-6 mb-3">
+                <a class="hover:text-primary" href="#" onclick="return false;">What is BPEL?</a>
+                <a class="hover:text-primary" href="#" onclick="return false;">About this demo</a>
+            </div>
+            <p>© 2024 Orchestration Demo. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Preload state classes so Tailwind CDN generates them -->
+    <div class="hidden">
+        <span class="text-status-info text-status-ok text-status-running text-status-error"></span>
+        <span class="bg-status-info bg-status-ok bg-status-running bg-status-error"></span>
+        <span class="bg-status-ok/20 bg-status-running/20 bg-status-error/20"></span>
+        <span class="border-status-ok/50 border-status-error/50 border-status-running/50"></span>
+    </div>
+
+    <script src="main.js" defer></script>
+</body>
+
+</html>
